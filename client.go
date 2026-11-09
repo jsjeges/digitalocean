@@ -64,7 +64,10 @@ func (p *Provider) addDNSEntry(ctx context.Context, zone string, record libdns.R
 
 	p.getClient()
 
-	entry := recordToGoDo(record)
+	entry, err := recordToGoDo(record)
+	if err != nil {
+		return record, err
+	}
 
 	rec, _, err := p.client.Domains.CreateRecord(ctx, zone, &entry)
 	if err != nil {
@@ -106,7 +109,10 @@ func (p *Provider) updateDNSEntry(ctx context.Context, zone string, record libdn
 		return record, err
 	}
 
-	entry := recordToGoDo(record)
+	entry, err := recordToGoDo(record)
+	if err != nil {
+		return record, err
+	}
 
 	_, _, err = p.client.Domains.EditRecord(ctx, zone, id, &entry)
 	if err != nil {
