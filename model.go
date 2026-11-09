@@ -1,7 +1,9 @@
 package digitalocean
 
 import (
+	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/digitalocean/godo"
@@ -40,15 +42,56 @@ func fromGodo(entry godo.DomainRecord) DNS {
 	}
 }
 
-// recordToGoDo converts a libdns.RR to the DigitalOcean API format
-func recordToGoDo(record libdns.Record) godo.DomainRecordEditRequest {
+// recordToGoDo converts a libdns.RR to the DigitalOcean API format.
+//
+// DigitalOcean expects the priority of an MX or SRV record, the port and weight
+// of an SRV record, and the flags and tag of a CAA record in dedicated request
+// fields, not in Data. libdns.RR.Data holds the complete RDATA, so those parts
+// are split back out of it here.
+//
+// The record is parsed rather than the string split by hand, so a malformed
+// value is reported instead of being sent as a Data the API would reject or
+// silently misread.
+func recordToGoDo(record libdns.Record) (godo.DomainRecordEditRequest, error) {
 	rr := record.RR()
-	return godo.DomainRecordEditRequest{
+
+	req := godo.DomainRecordEditRequest{
 		Name: rr.Name,
 		Data: rr.Data,
 		Type: rr.Type,
 		TTL:  int(rr.TTL.Seconds()),
 	}
+
+	switch rr.Type {
+	case "MX", "SRV", "CAA":
+	default:
+		return req, nil
+	}
+
+	parsed, err := rr.Parse()
+	if err != nil {
+		return req, fmt.Errorf("parsing %s record %q: %w", rr.Type, rr.Name, err)
+	}
+
+	switch v := parsed.(type) {
+	case libdns.MX:
+		req.Priority = int(v.Preference)
+		req.Data = v.Target
+	case libdns.SRV:
+		req.Priority = int(v.Priority)
+		req.Weight = int(v.Weight)
+		req.Port = int(v.Port)
+		req.Data = v.Target
+		// libdns splits the service and transport labels out of the owner
+		// name; DigitalOcean wants them back as part of it.
+		req.Name = strings.Trim(fmt.Sprintf("_%s._%s.%s", v.Service, v.Transport, v.Name), ".")
+	case libdns.CAA:
+		req.Flags = int(v.Flags)
+		req.Tag = v.Tag
+		req.Data = v.Value
+	}
+
+	return req, nil
 }
 
 // idFromRecord get the ID from a libdns.Record
