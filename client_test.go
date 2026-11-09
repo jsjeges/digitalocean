@@ -84,7 +84,7 @@ func TestClient_getDNSEntries_ExtraFields(t *testing.T) {
 		"10 mail.example.com",
 		"10 20 5060 sip.example.com",
 		`0 issue "letsencrypt.org"`,
-		`128 iodef "mailto:example@example.com"`,
+		`128 iodef "mailto:security@example.com"`,
 		"hello world",
 	}
 	if len(records) != len(wantData) {
@@ -118,7 +118,7 @@ func TestClient_getDNSEntries_ExtraFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CAA Parse() error: %v", err)
 	}
-	if got := caa.(libdns.CAA); got.Flags != 128 || got.Tag != "iodef" || got.Value != "mailto:example@example.com" {
+	if got := caa.(libdns.CAA); got.Flags != 128 || got.Tag != "iodef" || got.Value != "mailto:security@example.com" {
 		t.Errorf("CAA Parse() = %+v", got)
 	}
 }
